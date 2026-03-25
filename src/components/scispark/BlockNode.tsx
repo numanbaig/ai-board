@@ -140,15 +140,19 @@ export function BlockNode({
         />
       );
       if (anim.type === "orbit") {
-        const r = anim.radiusPx ?? 80;
+        const r = Math.max(24, anim.radiusPx ?? 80);
         const dur = anim.durationSec ?? 12;
         return (
           <div style={{ ...baseStyle, width: 0, height: 0, overflow: "visible" }}>
-            <motion.div
-              className="flex items-center justify-center"
-              style={{ width: 0, height: 0 }}
-              animate={{ rotate: 360 }}
-              transition={{ repeat: Infinity, duration: dur, ease: "linear" }}
+            <div
+              className="scispark-orbit-rotator"
+              style={{
+                width: 1,
+                height: 1,
+                marginLeft: -0.5,
+                marginTop: -0.5,
+                animationDuration: `${dur}s`,
+              }}
             >
               <div style={{ transform: `translateX(${r}px)` }}>
                 <div style={{ width: w, height: h }} className="relative">
@@ -156,7 +160,7 @@ export function BlockNode({
                   {labelEl}
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         );
       }
@@ -553,22 +557,24 @@ export function BlockNode({
           style={{ ...baseStyle, width: w, height: h }}
           className="relative overflow-hidden rounded-lg bg-sky-50/30"
         >
-          <motion.div
-            className="absolute inset-0"
-            animate={{ x: [0, dir * 14, 0] }}
-            transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <svg width={w} height={h} className="block" aria-hidden>
-              <path
-                d={d}
-                fill="none"
-                stroke={color}
-                strokeWidth={3}
-                strokeLinecap="round"
-                opacity={0.95}
-              />
-            </svg>
-          </motion.div>
+          <svg width={w} height={h} className="block" aria-hidden>
+            <motion.path
+              d={d}
+              fill="none"
+              stroke={color}
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeDasharray="10 14"
+              opacity={0.95}
+              initial={{ strokeDashoffset: 0 }}
+              animate={{ strokeDashoffset: dir * -96 }}
+              transition={{
+                duration: 14,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+            />
+          </svg>
           {labelEl}
         </div>
       );
@@ -593,14 +599,22 @@ export function BlockNode({
                 <polygon points="0 0, 8 4, 0 8" fill={color} />
               </marker>
             </defs>
-            <path
+            <motion.path
               d={path}
               fill="none"
               stroke={color}
               strokeWidth={4}
               strokeLinecap="round"
+              strokeDasharray="14 12"
               markerEnd={`url(#arr-${block.id})`}
               opacity={0.9}
+              initial={{ strokeDashoffset: 0 }}
+              animate={{ strokeDashoffset: -52 }}
+              transition={{
+                duration: 12,
+                repeat: Infinity,
+                ease: "linear",
+              }}
             />
           </svg>
           {labelEl}
@@ -621,7 +635,7 @@ export function BlockNode({
       };
       const bg = fills[tone] ?? fills.neutral;
       return (
-        <div
+        <motion.div
           style={{
             ...baseStyle,
             width: w,
@@ -632,6 +646,12 @@ export function BlockNode({
             boxShadow: "inset 0 0 20px rgba(255,255,255,0.25)",
           }}
           className="relative flex items-center justify-center"
+          animate={{ scale: [1, 1.045, 1] }}
+          transition={{
+            duration: 5.5,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
         >
           {regionLabel ? (
             <span className="px-2 text-center text-[11px] font-black uppercase tracking-wide text-slate-800 drop-shadow-sm">
@@ -639,7 +659,7 @@ export function BlockNode({
             </span>
           ) : null}
           {labelEl}
-        </div>
+        </motion.div>
       );
     }
 
@@ -674,14 +694,30 @@ export function BlockNode({
       return (
         <div style={{ ...baseStyle, width: w, height: h }} className="relative">
           <svg width={w} height={h} aria-hidden>
-            {lines}
-            <circle
+            <motion.g
+              animate={{ rotate: 360 }}
+              transition={{
+                duration: 96,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+              style={{ transformOrigin: `${cx}px ${cy}px` }}
+            >
+              {lines}
+            </motion.g>
+            <motion.circle
               cx={cx}
               cy={cy}
               r={r0 * 0.9}
               fill="rgba(255,255,255,0.9)"
               stroke={color}
               strokeWidth={2}
+              animate={{ opacity: [0.92, 1, 0.92] }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
             />
           </svg>
           {labelEl}
@@ -767,7 +803,7 @@ export function BlockNode({
                 initial={{ opacity: 0.35 }}
                 animate={{ opacity: [0.35, 1, 0.35], cy: [p.y - 3, p.y + 3, p.y - 3] }}
                 transition={{
-                  duration: 2 + p.d,
+                  duration: 3.8 + p.d * 1.2,
                   repeat: Infinity,
                   delay: p.d,
                   ease: "easeInOut",

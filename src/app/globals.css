@@ -18,3 +18,26 @@ body {
 .font-display {
   font-family: var(--font-scispark-display), ui-sans-serif, system-ui, sans-serif;
 }
+
+/* Planet orbit: reliable CSS rotation (avoids nested transform quirks with 0×0 boxes). */
+@keyframes scispark-orbit-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.scispark-orbit-rotator {
+  transform-origin: center center;
+  animation-name: scispark-orbit-rotate;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scispark-orbit-rotator {
+    animation: none;
+  }
+}

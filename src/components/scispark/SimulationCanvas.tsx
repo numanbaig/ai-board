@@ -8,13 +8,18 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
-import type { SimulationBlock } from "@/lib/scispark/simulation-schema";
+import type {
+  SceneBackdrop,
+  SimulationBlock,
+} from "@/lib/scispark/simulation-schema";
 import { BoardLayer } from "./BoardLayer";
 import { BlockNode } from "./BlockNode";
 import { SelectedBlockToolbar } from "./SelectedBlockToolbar";
+import { StageBackdrop } from "./StageBackdrop";
 
 export const STAGE_ID = "scispark-stage";
 
@@ -36,9 +41,21 @@ function clampPct(n: number) {
   return Math.min(98, Math.max(2, n));
 }
 
+function blockVisibleAtStep(block: SimulationBlock, activeStep: number): boolean {
+  const raw = block.props?.showFromStep;
+  if (raw === undefined || raw === null) return true;
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (Number.isNaN(n)) return true;
+  return activeStep >= n;
+}
+
 type Props = {
   title: string;
   blocks: SimulationBlock[];
+  /** Story step for progressive block reveal (props.showFromStep). */
+  activeStep?: number;
+  /** Optional world layer behind blocks. */
+  backdrop?: SceneBackdrop;
   onOpenPalette?: () => void;
   paletteOpen?: boolean;
   onPatchBlock?: (id: string, patch: Partial<SimulationBlock>) => void;
@@ -52,11 +69,13 @@ type Props = {
 function DraggablePlacedBlock({
   block,
   isSelected,
+  activeStep,
   onSelectBlock,
   onPatchBlock,
 }: {
   block: SimulationBlock;
   isSelected: boolean;
+  activeStep: number;
   onSelectBlock: (id: string) => void;
   onPatchBlock?: (id: string, patch: Partial<SimulationBlock>) => void;
 }) {
@@ -67,17 +86,19 @@ function DraggablePlacedBlock({
     });
 
   const dragTransform = transform ? CSS.Translate.toString(transform) : "";
+  const visible = blockVisibleAtStep(block, activeStep);
 
   return (
     <div
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
+      {...(visible ? listeners : {})}
+      {...(visible ? attributes : {})}
       data-board-block
-      onPointerDownCapture={() => onSelectBlock(block.id)}
-      className={`absolute touch-none rounded-sm ${isDragging ? "z-[60]" : ""} ${
+      onPointerDownCapture={() => visible && onSelectBlock(block.id)}
+      aria-hidden={!visible}
+      className={`absolute touch-none rounded-sm transition-opacity duration-300 ${isDragging ? "z-[60]" : ""} ${
         isSelected ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-transparent" : ""
-      }`}
+      } ${visible ? "" : "pointer-events-none opacity-0"}`}
       style={{
         left: `${block.x}%`,
         top: `${block.y}%`,
@@ -85,7 +106,7 @@ function DraggablePlacedBlock({
         height: 0,
         transform: `translate(-50%, -50%)${dragTransform ? ` ${dragTransform}` : ""}`,
         zIndex: (block.zIndex ?? 1) + (isDragging ? 40 : 0),
-        cursor: isDragging ? "grabbing" : "grab",
+        cursor: visible ? (isDragging ? "grabbing" : "grab") : "default",
       }}
     >
       <BlockNode block={block} embedded onPatchBlock={onPatchBlock} />
@@ -98,6 +119,8 @@ export const SimulationCanvas = forwardRef<SimulationCanvasHandle, Props>(
     {
       title,
       blocks,
+      activeStep = 0,
+      backdrop,
       onOpenPalette,
       paletteOpen = true,
       onPatchBlock,
@@ -147,6 +170,14 @@ export const SimulationCanvas = forwardRef<SimulationCanvasHandle, Props>(
     }, [blocks, selectedBlockId]);
 
     useEffect(() => {
+      if (!selectedBlockId) return;
+      const b = blocks.find((x) => x.id === selectedBlockId);
+      if (b && !blockVisibleAtStep(b, activeStep)) {
+        setSelectedBlockId(null);
+      }
+    }, [activeStep, blocks, selectedBlockId]);
+
+    useEffect(() => {
       const onKey = (e: KeyboardEvent) => {
         if (e.key === "Escape") setSelectedBlockId(null);
       };
@@ -170,6 +201,10 @@ export const SimulationCanvas = forwardRef<SimulationCanvasHandle, Props>(
 
     const z = boardZoom;
     const invPct = `${(100 / z).toFixed(4)}%`;
+    const sortedBlocks = useMemo(
+      () => [...blocks].sort((a, b) => (a.zIndex ?? 1) - (b.zIndex ?? 1)),
+      [blocks],
+    );
     const selectedBlock =
       selectedBlockId != null
         ? (blocks.find((b) => b.id === selectedBlockId) ?? null)
@@ -277,7 +312,7 @@ export const SimulationCanvas = forwardRef<SimulationCanvasHandle, Props>(
         <div
           ref={zoomViewportRef}
           title="Ctrl or ⌘ + scroll wheel to zoom"
-          className={`relative min-h-0 flex-1 overflow-auto rounded-xl border-2 border-dashed border-indigo-200/80 bg-slate-200/40 ${
+          className={`relative min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200/90 bg-neutral-100 ${
             isOver ? "ring-2 ring-amber-300/80 sm:ring-4" : ""
           }`}
         >
@@ -305,7 +340,11 @@ export const SimulationCanvas = forwardRef<SimulationCanvasHandle, Props>(
               );
               onAddTextNoteAt(xPct, yPct);
             }}
-            className="relative bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.95),transparent_55%),radial-gradient(circle_at_80%_30%,rgba(224,231,255,0.9),transparent_50%),linear-gradient(160deg,#eef2ff,#fdf4ff)]"
+            className={
+              backdrop && backdrop.type !== "plain"
+                ? "relative bg-slate-900/5"
+                : "relative bg-white"
+            }
             style={{
               width: invPct,
               height: invPct,
@@ -314,7 +353,7 @@ export const SimulationCanvas = forwardRef<SimulationCanvasHandle, Props>(
               transformOrigin: "top left",
             }}
           >
-            <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(99,102,241,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.12)_1px,transparent_1px)] [background-size:24px_24px]" />
+            {backdrop ? <StageBackdrop backdrop={backdrop} /> : null}
             <div
               className={
                 boardLocksBlocks
@@ -322,10 +361,11 @@ export const SimulationCanvas = forwardRef<SimulationCanvasHandle, Props>(
                   : "absolute inset-0 z-[1]"
               }
             >
-              {blocks.map((b) => (
+              {sortedBlocks.map((b) => (
                 <DraggablePlacedBlock
                   key={b.id}
                   block={b}
+                  activeStep={activeStep}
                   isSelected={b.id === selectedBlockId}
                   onSelectBlock={setSelectedBlockId}
                   onPatchBlock={onPatchBlock}

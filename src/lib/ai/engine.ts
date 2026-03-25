@@ -7,7 +7,9 @@ import {
   simulationSpecSchema,
   type SimulationSpec,
 } from "@/lib/scispark/simulation-schema";
+import { blockCatalogPromptFragment } from "@/lib/scispark/block-catalog";
 import { demoSimulationForQuestion } from "@/lib/scispark/demo-simulations";
+import { normalizeSimulationSpec } from "@/lib/scispark/spec-normalize";
 
 function stripJsonFence(raw: string): string {
   let t = raw.trim();
@@ -31,7 +33,7 @@ export async function generateSimulationFromQuestion(
   userMessage: string,
   history: ChatMessage[] = [],
 ): Promise<GenerateSimulationResult> {
-  const system = buildSciSparkSystemPrompt();
+  const system = buildSciSparkSystemPrompt(blockCatalogPromptFragment());
   const messages: ChatMessage[] = [
     ...history,
     { role: "user", content: userMessage },
@@ -44,7 +46,11 @@ export async function generateSimulationFromQuestion(
     if (!parsed.success) {
       return { ok: false, error: "Demo simulation failed validation." };
     }
-    return { ok: true, spec: parsed.data, usedDemo: true };
+    return {
+      ok: true,
+      spec: normalizeSimulationSpec(parsed.data),
+      usedDemo: true,
+    };
   }
 
   try {
@@ -77,7 +83,7 @@ export async function generateSimulationFromQuestion(
     }
     return {
       ok: true,
-      spec: parsed.data,
+      spec: normalizeSimulationSpec(parsed.data),
       usedDemo: false,
       provider: resolved.provider.id,
       warning: extraWarning,
@@ -96,7 +102,7 @@ export async function generateSimulationFromQuestion(
       if (parsedDemo.success) {
         return {
           ok: true,
-          spec: parsedDemo.data,
+          spec: normalizeSimulationSpec(parsedDemo.data),
           usedDemo: true,
           provider: "gemini",
           warning:

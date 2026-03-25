@@ -14,10 +14,15 @@ import {
 } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { useCallback, useRef, useState } from "react";
-import type { SimulationBlock } from "@/lib/scispark/simulation-schema";
+import type {
+  SimulationBlock,
+  SimulationSpec,
+} from "@/lib/scispark/simulation-schema";
 import { BLOCK_CATEGORIES } from "@/lib/scispark/block-catalog";
 import { scaleBlockDimensions } from "@/lib/scispark/block-scale";
+import { normalizeSimulationSpec } from "@/lib/scispark/spec-normalize";
 import { AIPanel } from "./AIPanel";
+import { ConceptPromptBar } from "./ConceptPromptBar";
 import { BlockPalette } from "./BlockPalette";
 import {
   STAGE_ID,
@@ -26,12 +31,6 @@ import {
 } from "./SimulationCanvas";
 
 type ChatLine = { role: "user" | "assistant"; text: string };
-
-type Scene = {
-  title: string;
-  explanationSteps: string[];
-  blocks: SimulationBlock[];
-};
 
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
@@ -105,7 +104,7 @@ function defaultBlockForType(type: string, x: number, y: number): SimulationBloc
 
 export function SciSparkShell() {
   const stageApiRef = useRef<SimulationCanvasHandle>(null);
-  const [scene, setScene] = useState<Scene | null>(null);
+  const [scene, setScene] = useState<SimulationSpec | null>(null);
   const [messages, setMessages] = useState<ChatLine[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
@@ -192,7 +191,7 @@ export function SciSparkShell() {
           title: "My experiment",
           explanationSteps: ["You added a note on the board!"],
           blocks: [],
-        } as Scene);
+        } as SimulationSpec);
       return { ...base, blocks: [...base.blocks, nb] };
     });
     setActiveStep(0);
@@ -227,7 +226,7 @@ export function SciSparkShell() {
             title: "My experiment",
             explanationSteps: ["You placed a new block on the stage!"],
             blocks: [],
-          } as Scene);
+          } as SimulationSpec);
         return { ...base, blocks: [...base.blocks, nb] };
       });
       setActiveStep(0);
@@ -291,7 +290,7 @@ export function SciSparkShell() {
           }),
         });
         const data = (await res.json()) as {
-          spec?: Scene;
+          spec?: SimulationSpec;
           error?: string;
           hint?: string;
           meta?: {
@@ -311,7 +310,7 @@ export function SciSparkShell() {
           return;
         }
         if (data.spec) {
-          setScene(data.spec);
+          setScene(normalizeSimulationSpec(data.spec));
           setActiveStep(0);
           setLastMeta(
             data.meta ?? {
@@ -378,28 +377,34 @@ export function SciSparkShell() {
               </button>
             )}
 
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:items-stretch lg:gap-2">
-              <SimulationCanvas
-                ref={stageApiRef}
-                title={title}
-                blocks={blocks}
-                onOpenPalette={() => setPaletteOpen(true)}
-                paletteOpen={paletteOpen}
-                onPatchBlock={patchBlock}
-                onRemoveBlock={removeBlock}
-                onRemoveGroup={removeGroup}
-                onScaleSelection={scaleSelection}
-                onAddTextNoteAt={addTextNoteAt}
-              />
-              <AIPanel
-                messages={messages}
-                onSend={handleSend}
-                loading={loading}
-                activeStep={activeStep}
-                totalSteps={steps.length}
-                onStepChange={setActiveStep}
-                lastMeta={lastMeta}
-              />
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:items-stretch lg:gap-2">
+                <SimulationCanvas
+                  ref={stageApiRef}
+                  title={title}
+                  blocks={blocks}
+                  activeStep={activeStep}
+                  backdrop={scene?.backdrop}
+                  onOpenPalette={() => setPaletteOpen(true)}
+                  paletteOpen={paletteOpen}
+                  onPatchBlock={patchBlock}
+                  onRemoveBlock={removeBlock}
+                  onRemoveGroup={removeGroup}
+                  onScaleSelection={scaleSelection}
+                  onAddTextNoteAt={addTextNoteAt}
+                />
+                <AIPanel
+                  messages={messages}
+                  onSend={handleSend}
+                  loading={loading}
+                  activeStep={activeStep}
+                  totalSteps={steps.length}
+                  onStepChange={setActiveStep}
+                  lastMeta={lastMeta}
+                  showComposer={false}
+                />
+              </div>
+              <ConceptPromptBar onSend={handleSend} loading={loading} />
             </div>
           </div>
           {highlight && (

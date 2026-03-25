@@ -12,6 +12,8 @@ type Props = {
   totalSteps: number;
   onStepChange: (n: number) => void;
   lastMeta: { usedDemo: boolean; provider: string | null } | null;
+  /** When false, main composer lives elsewhere (e.g. ConceptPromptBar). */
+  showComposer?: boolean;
 };
 
 export function AIPanel({
@@ -22,6 +24,7 @@ export function AIPanel({
   totalSteps,
   onStepChange,
   lastMeta,
+  showComposer = true,
 }: Props) {
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -103,27 +106,33 @@ export function AIPanel({
         <div ref={bottomRef} />
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="mt-1.5 flex h-10 shrink-0 gap-1.5 border-t border-violet-100/90 pt-1.5 sm:h-11"
-      >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="What do you wonder?"
-          className="min-w-0 flex-1 rounded-xl border-2 border-violet-100 bg-white px-2.5 text-xs font-medium text-slate-900 shadow-inner outline-none ring-violet-400 placeholder:text-slate-400 focus:border-violet-300 focus:ring-2 sm:text-sm"
-          disabled={loading}
-          maxLength={2000}
-          aria-label="Your question"
-        />
-        <button
-          type="submit"
-          disabled={loading || !input.trim()}
-          className="h-full shrink-0 rounded-xl bg-gradient-to-br from-fuchsia-500 to-orange-400 px-3 text-xs font-black text-white shadow-md transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:text-sm"
+      {showComposer ? (
+        <form
+          onSubmit={handleSubmit}
+          className="mt-1.5 flex h-10 shrink-0 gap-1.5 border-t border-violet-100/90 pt-1.5 sm:h-11"
         >
-          Go
-        </button>
-      </form>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="What do you wonder?"
+            className="min-w-0 flex-1 rounded-xl border-2 border-violet-100 bg-white px-2.5 text-xs font-medium text-slate-900 shadow-inner outline-none ring-violet-400 placeholder:text-slate-400 focus:border-violet-300 focus:ring-2 sm:text-sm"
+            disabled={loading}
+            maxLength={2000}
+            aria-label="Your question"
+          />
+          <button
+            type="submit"
+            disabled={loading || !input.trim()}
+            className="h-full shrink-0 rounded-xl bg-gradient-to-br from-fuchsia-500 to-orange-400 px-3 text-xs font-black text-white shadow-md transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:text-sm"
+          >
+            Go
+          </button>
+        </form>
+      ) : (
+        <p className="mt-1.5 shrink-0 border-t border-violet-100/90 pt-1.5 text-[10px] font-medium text-slate-500">
+          Ask below the board — your chat history stays here.
+        </p>
+      )}
     </aside>
   );
 }

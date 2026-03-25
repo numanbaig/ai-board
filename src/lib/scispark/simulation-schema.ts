@@ -39,12 +39,25 @@ export const simulationBlockSchema = z.object({
   groupId: z.string().optional(),
 });
 
+/** Full-stage environment behind blocks (optional; omit for classic grid look). */
+export const sceneBackdropSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("plain") }),
+  z.object({
+    type: z.literal("sky-ground"),
+    /** Fraction from top (0–1) where ground starts; default ~0.62 */
+    horizon: z.number().min(0.4).max(0.85).optional(),
+  }),
+  z.object({ type: z.literal("space-dark") }),
+]);
+
 export const simulationSpecSchema = z.object({
   title: z.string(),
   explanationSteps: z.array(z.string()).min(1),
   blocks: z.array(simulationBlockSchema),
+  backdrop: sceneBackdropSchema.optional(),
 });
 
 export type BlockAnimation = z.infer<typeof blockAnimationSchema>;
 export type SimulationBlock = z.infer<typeof simulationBlockSchema>;
+export type SceneBackdrop = z.infer<typeof sceneBackdropSchema>;
 export type SimulationSpec = z.infer<typeof simulationSpecSchema>;
