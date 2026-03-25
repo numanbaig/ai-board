@@ -19,6 +19,10 @@ body {
   font-family: var(--font-scispark-display), ui-sans-serif, system-ui, sans-serif;
 }
 
+.font-board-note {
+  font-family: var(--font-board-note), cursive, ui-serif, serif;
+}
+
 /* Planet orbit: reliable CSS rotation (avoids nested transform quirks with 0×0 boxes). */
 @keyframes scispark-orbit-rotate {
   from {

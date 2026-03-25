@@ -1,5 +1,5 @@
 import { getGeminiKey, getSciSparkAiModel } from "./config";
-import { buildSciSparkSystemPrompt } from "./system-prompt";
+import { buildWhiteboardSystemPrompt } from "./system-prompt";
 import type { ChatMessage } from "./types";
 import { createSciSparkAiProvider } from "./providers/factory";
 import { completeGeminiWithFallback } from "./providers/gemini-fallback";
@@ -7,7 +7,6 @@ import {
   simulationSpecSchema,
   type SimulationSpec,
 } from "@/lib/scispark/simulation-schema";
-import { blockCatalogPromptFragment } from "@/lib/scispark/block-catalog";
 import { demoSimulationForQuestion } from "@/lib/scispark/demo-simulations";
 import { coerceRawSimulationJson } from "@/lib/scispark/spec-coerce";
 import { normalizeSimulationSpec } from "@/lib/scispark/spec-normalize";
@@ -19,6 +18,28 @@ function stripJsonFence(raw: string): string {
   }
   return t.trim();
 }
+
+const EXTEND_MAX_JSON = 14_000;
+
+function extendPayload(spec: SimulationSpec): string {
+  const snapshot = JSON.stringify({
+    title: spec.title,
+    explanationSteps: spec.explanationSteps,
+    aiStrokes: spec.aiStrokes,
+    notePanels: spec.notePanels ?? [],
+    backdrop: spec.backdrop,
+  });
+  const clipped =
+    snapshot.length > EXTEND_MAX_JSON
+      ? snapshot.slice(0, EXTEND_MAX_JSON) + "…"
+      : snapshot;
+  return `\n\n[EXTEND_BOARD_STATE]\n${clipped}\n[/EXTEND_BOARD_STATE]\n\nReturn complete merged JSON as specified in the system prompt.`;
+}
+
+export type GenerateOptions = {
+  intent?: "replace" | "extend";
+  existingSpec?: SimulationSpec | null;
+};
 
 export type GenerateSimulationResult =
   | {
@@ -33,11 +54,18 @@ export type GenerateSimulationResult =
 export async function generateSimulationFromQuestion(
   userMessage: string,
   history: ChatMessage[] = [],
+  options: GenerateOptions = {},
 ): Promise<GenerateSimulationResult> {
-  const system = buildSciSparkSystemPrompt(blockCatalogPromptFragment());
+  const system = buildWhiteboardSystemPrompt();
+
+  const augmentedUser =
+    options.intent === "extend" && options.existingSpec
+      ? `${userMessage}${extendPayload(options.existingSpec)}`
+      : userMessage;
+
   const messages: ChatMessage[] = [
     ...history,
-    { role: "user", content: userMessage },
+    { role: "user", content: augmentedUser },
   ];
 
   const resolved = createSciSparkAiProvider();

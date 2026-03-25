@@ -1,155 +1,78 @@
-import type { SimulationBlock, SimulationSpec } from "./simulation-schema";
+import type { AiStroke, NotePanel, SimulationSpec } from "./simulation-schema";
 
-const XY_EPS = 0.01;
-const MIN_ORBIT_RADIUS_PX = 24;
-const MAX_ORBIT_RADIUS_PX = 140;
-const DEFAULT_ORBIT_DURATION_SEC = 13;
-const FALLBACK_ORBIT_RADIUS_PX = 90;
-
-function sameCluster(a: SimulationBlock, b: SimulationBlock): boolean {
-  return a.groupId === b.groupId;
+function clamp01(n: number): number {
+  return Math.min(1, Math.max(0, n));
 }
 
-function samePosition(a: SimulationBlock, b: SimulationBlock): boolean {
-  return (
-    Math.abs(a.x - b.x) < XY_EPS && Math.abs(a.y - b.y) < XY_EPS
-  );
-}
-
-/**
- * Prefer a sun that shares groupId with `body`. If none (common model mistake:
- * sun has groupId, planet omits it or uses another), fall back to the only sun
- * in the spec for planet/orbit-path so orbit repair still runs.
- */
-function findSunForBody(
-  blocks: SimulationBlock[],
-  body: SimulationBlock,
-): SimulationBlock | undefined {
-  const strict = blocks.find(
-    (s) => s.type === "sun" && sameCluster(s, body),
-  );
-  if (strict) return strict;
-
-  const suns = blocks.filter((s) => s.type === "sun");
-  if (suns.length !== 1) return undefined;
-
-  if (body.type === "planet" || body.type === "orbit-path") {
-    return suns[0];
-  }
-  return undefined;
-}
-
-function orbitPathHalfSize(
-  blocks: SimulationBlock[],
-  anchor: SimulationBlock,
-  sun: SimulationBlock,
-): number | null {
-  const path =
-    blocks.find(
-      (b) =>
-        b.type === "orbit-path" &&
-        sameCluster(b, anchor) &&
-        samePosition(b, anchor),
-    ) ??
-    blocks.find(
-      (b) => b.type === "orbit-path" && samePosition(b, sun),
-    );
-  if (!path) return null;
-  const w = path.width ?? 220;
-  const h = path.height ?? 220;
-  return Math.min(w, h) / 2;
-}
-
-function clampOrbitRadius(r: number): number {
-  return Math.min(
-    MAX_ORBIT_RADIUS_PX,
-    Math.max(MIN_ORBIT_RADIUS_PX, Math.round(r)),
-  );
-}
-
-function canonicalizeBlockTypes(blocks: SimulationBlock[]): SimulationBlock[] {
-  return blocks.map((b) => ({
-    ...b,
-    type: b.type.trim().toLowerCase(),
+function clampStroke(s: AiStroke): AiStroke {
+  const points = s.points.map((p) => ({
+    x: clamp01(p.x),
+    y: clamp01(p.y),
   }));
+  const stepIndex =
+    s.stepIndex === undefined || Number.isNaN(s.stepIndex)
+      ? 0
+      : Math.max(0, Math.floor(s.stepIndex));
+  return {
+    ...s,
+    points,
+    stepIndex,
+    lineWidth:
+      s.lineWidth !== undefined && Number.isFinite(s.lineWidth)
+        ? Math.min(48, Math.max(0.5, s.lineWidth))
+        : 3,
+    color: s.color?.trim() || "#1e293b",
+  };
 }
 
-/**
- * Aligns orbit-path + planet/moon with the sun, fixes missing or zero orbit
- * radius, and tolerates mismatched groupId between sun and planet.
- */
+function clampNote(n: NotePanel): NotePanel {
+  return {
+    ...n,
+    x: Math.min(100, Math.max(0, n.x)),
+    y: Math.min(100, Math.max(0, n.y)),
+    stepIndex: Math.max(0, Math.floor(n.stepIndex)),
+    text: n.text.trim(),
+    width: n.width !== undefined ? Math.min(100, Math.max(10, n.width)) : undefined,
+    maxWidthPct:
+      n.maxWidthPct !== undefined
+        ? Math.min(95, Math.max(20, n.maxWidthPct))
+        : undefined,
+  };
+}
+
+/** Dedupe stroke ids (keep first). */
+function dedupeStrokes(strokes: AiStroke[]): AiStroke[] {
+  const seen = new Set<string>();
+  const out: AiStroke[] = [];
+  for (const s of strokes) {
+    if (seen.has(s.id)) continue;
+    seen.add(s.id);
+    out.push(s);
+  }
+  return out;
+}
+
+function dedupeNotes(notes: NotePanel[]): NotePanel[] {
+  const seen = new Set<string>();
+  const out: NotePanel[] = [];
+  for (const n of notes) {
+    if (seen.has(n.id)) continue;
+    seen.add(n.id);
+    out.push(n);
+  }
+  return out;
+}
+
 export function normalizeSimulationSpec(spec: SimulationSpec): SimulationSpec {
-  const blocks = canonicalizeBlockTypes(spec.blocks.map((b) => ({ ...b })));
-
-  for (let i = 0; i < blocks.length; i++) {
-    const b = blocks[i];
-    if (b.type !== "orbit-path") continue;
-    const sun = findSunForBody(blocks, b);
-    if (!sun || samePosition(sun, b)) continue;
-    blocks[i] = {
-      ...b,
-      x: sun.x,
-      y: sun.y,
-      ...(sameCluster(sun, b) ? {} : { groupId: sun.groupId ?? b.groupId }),
-    };
-  }
-
-  for (let i = 0; i < blocks.length; i++) {
-    const b = blocks[i];
-    if (b.type !== "planet" && b.type !== "moon") continue;
-
-    const sun = findSunForBody(blocks, b);
-    if (!sun) continue;
-
-    let centered: SimulationBlock = samePosition(sun, b)
-      ? b
-      : { ...b, x: sun.x, y: sun.y };
-    if (!sameCluster(sun, b)) {
-      centered = {
-        ...centered,
-        groupId: sun.groupId ?? centered.groupId,
-      };
-    }
-
-    const halfPath = orbitPathHalfSize(blocks, centered, sun);
-    const pw = centered.width ?? 36;
-    const ph = centered.height ?? 36;
-    const planetHalf = Math.min(pw, ph) / 2;
-
-    let derivedR: number;
-    if (halfPath != null) {
-      derivedR = clampOrbitRadius(halfPath - planetHalf);
-    } else {
-      derivedR = FALLBACK_ORBIT_RADIUS_PX;
-    }
-
-    const anim = centered.animation;
-    if (!anim || anim.type !== "orbit") {
-      blocks[i] = {
-        ...centered,
-        animation: {
-          type: "orbit",
-          radiusPx: derivedR,
-          durationSec: DEFAULT_ORBIT_DURATION_SEC,
-        },
-      };
-      continue;
-    }
-
-    const r = anim.radiusPx;
-    if (r == null || r < MIN_ORBIT_RADIUS_PX) {
-      blocks[i] = {
-        ...centered,
-        animation: {
-          type: "orbit",
-          radiusPx: derivedR,
-          durationSec: anim.durationSec ?? DEFAULT_ORBIT_DURATION_SEC,
-        },
-      };
-    } else {
-      blocks[i] = centered;
-    }
-  }
-
-  return { ...spec, blocks };
+  const aiStrokes = dedupeStrokes(
+    (spec.aiStrokes ?? []).map((s) => clampStroke({ ...s })),
+  );
+  const notePanels = dedupeNotes(
+    (spec.notePanels ?? []).map((n) => clampNote({ ...n })),
+  );
+  return {
+    ...spec,
+    aiStrokes,
+    notePanels,
+  };
 }

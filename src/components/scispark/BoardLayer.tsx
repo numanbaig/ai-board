@@ -1,10 +1,11 @@
 "use client";
 
-import { useDndMonitor } from "@dnd-kit/core";
 import {
+  forwardRef,
   useCallback,
   useEffect,
   useId,
+  useImperativeHandle,
   useRef,
   useState,
   type ReactNode,
@@ -12,6 +13,10 @@ import {
 import { createPortal } from "react-dom";
 import type { BoardTool, Stroke, StrokePoint } from "./board-types";
 import { BOARD_COLORS, BOARD_WIDTHS } from "./board-types";
+
+export type BoardLayerHandle = {
+  clearAll: () => void;
+};
 
 type Props = {
   /** When false, blocks on the stage should ignore pointer (drawing mode). */
@@ -66,10 +71,10 @@ function drawStroke(
   ctx.restore();
 }
 
-export function BoardLayer({
-  onInteractionLockChange,
-  toolbarPortalHost,
-}: Props) {
+export const BoardLayer = forwardRef<BoardLayerHandle, Props>(function BoardLayer(
+  { onInteractionLockChange, toolbarPortalHost }: Props,
+  ref,
+) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const draftRef = useRef<Stroke | null>(null);
@@ -81,21 +86,8 @@ export function BoardLayer({
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [past, setPast] = useState<Stroke[][]>([]);
   const [future, setFuture] = useState<Stroke[][]>([]);
-  const [dndDragging, setDndDragging] = useState(false);
 
   const toolbarId = useId();
-
-  useDndMonitor({
-    onDragStart() {
-      setDndDragging(true);
-    },
-    onDragEnd() {
-      setDndDragging(false);
-    },
-    onDragCancel() {
-      setDndDragging(false);
-    },
-  });
 
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -177,8 +169,25 @@ export function BoardLayer({
     setStrokes([]);
   }, [strokes]);
 
+  const clearAllSilent = useCallback(() => {
+    if (strokes.length === 0) return;
+    setPast((p) => [...p, strokes]);
+    setFuture([]);
+    setStrokes([]);
+  }, [strokes]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      clearAll: () => {
+        clearAllSilent();
+      },
+    }),
+    [clearAllSilent],
+  );
+
   const drawing = tool !== "select";
-  const canvasInteractive = drawing && !dndDragging;
+  const canvasInteractive = drawing;
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (!canvasInteractive || !canvasRef.current) return;
@@ -378,7 +387,7 @@ export function BoardLayer({
         : null}
     </>
   );
-}
+});
 
 function ToolBtn({
   active,

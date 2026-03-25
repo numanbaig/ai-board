@@ -8,6 +8,8 @@ import {
   getGeminiKey,
   getOpenAiKey,
 } from "@/lib/ai/config";
+import { simulationSpecSchema } from "@/lib/scispark/simulation-schema";
+import { normalizeSimulationSpec } from "@/lib/scispark/spec-normalize";
 
 const bodySchema = z.object({
   message: z.string().min(1).max(2000),
@@ -20,6 +22,8 @@ const bodySchema = z.object({
     )
     .max(20)
     .optional(),
+  intent: z.enum(["replace", "extend"]).optional(),
+  existingSpec: simulationSpecSchema.nullable().optional(),
 });
 
 export async function POST(req: Request) {
@@ -38,10 +42,17 @@ export async function POST(req: Request) {
     );
   }
 
-  const { message, history } = parsed.data;
+  const { message, history, intent, existingSpec: rawExisting } = parsed.data;
   const chatHistory = (history ?? []) as ChatMessage[];
 
-  const result = await generateSimulationFromQuestion(message, chatHistory);
+  const existingSpec =
+    rawExisting != null ? normalizeSimulationSpec(rawExisting) : null;
+  const wantsExtend = intent === "extend" && existingSpec != null;
+
+  const result = await generateSimulationFromQuestion(message, chatHistory, {
+    intent: wantsExtend ? "extend" : "replace",
+    existingSpec: wantsExtend ? existingSpec : null,
+  });
 
   if (!result.ok) {
     const id = getSciSparkAiProvider();

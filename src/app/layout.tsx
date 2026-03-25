@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Fredoka, Nunito } from "next/font/google";
+import { Caveat, Fredoka, Nunito } from "next/font/google";
 import "./globals.css";
 
 const display = Fredoka({
@@ -14,10 +14,16 @@ const body = Nunito({
   weight: ["500", "600", "700", "800"],
 });
 
+const boardNote = Caveat({
+  variable: "--font-board-note",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+});
+
 export const metadata: Metadata = {
-  title: "SciSpark — AI visual learning for kids",
+  title: "Understand — AI whiteboard",
   description:
-    "Interactive science and math playground: ask questions, see animated simulations, drag blocks like Scratch.",
+    "Ask questions; AI draws and explains on a live whiteboard with stroke-by-step visuals.",
 };
 
 export default function RootLayout({
@@ -28,7 +34,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${display.variable} ${body.variable} h-full antialiased`}
+      className={`${display.variable} ${body.variable} ${boardNote.variable} h-full antialiased`}
     >
       <body className="flex min-h-dvh flex-col bg-[linear-gradient(145deg,#fdf4ff_0%,#e0f2fe_45%,#fef9c3_100%)] font-sans text-slate-900">
         {children}

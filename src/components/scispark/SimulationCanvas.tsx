@@ -1,24 +1,16 @@
 "use client";
 
-import { useDroppable } from "@dnd-kit/core";
-import { useDraggable } from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
 import {
   forwardRef,
   useCallback,
   useEffect,
   useImperativeHandle,
-  useMemo,
   useRef,
   useState,
 } from "react";
-import type {
-  SceneBackdrop,
-  SimulationBlock,
-} from "@/lib/scispark/simulation-schema";
-import { BoardLayer } from "./BoardLayer";
-import { BlockNode } from "./BlockNode";
-import { SelectedBlockToolbar } from "./SelectedBlockToolbar";
+import type { AiStroke, NotePanel, SceneBackdrop } from "@/lib/scispark/simulation-schema";
+import { AIStrokeLayer } from "./AIStrokeLayer";
+import { BoardLayer, type BoardLayerHandle } from "./BoardLayer";
 import { StageBackdrop } from "./StageBackdrop";
 
 export const STAGE_ID = "scispark-stage";
@@ -32,158 +24,71 @@ function clampZoom(n: number) {
 }
 
 export type SimulationCanvasHandle = {
-  getBounds: () => DOMRect | null;
-  /** Focus selection on a block (e.g. after adding a text note). */
-  selectBlock: (id: string) => void;
+  clearUserSketches: () => void;
 };
-
-function clampPct(n: number) {
-  return Math.min(98, Math.max(2, n));
-}
-
-function blockVisibleAtStep(block: SimulationBlock, activeStep: number): boolean {
-  const raw = block.props?.showFromStep;
-  if (raw === undefined || raw === null) return true;
-  const n = typeof raw === "number" ? raw : Number(raw);
-  if (Number.isNaN(n)) return true;
-  return activeStep >= n;
-}
 
 type Props = {
   title: string;
-  blocks: SimulationBlock[];
-  /** Story step for progressive block reveal (props.showFromStep). */
+  aiStrokes: AiStroke[];
+  notePanels: NotePanel[];
   activeStep?: number;
-  /** Optional world layer behind blocks. */
   backdrop?: SceneBackdrop;
-  onOpenPalette?: () => void;
-  paletteOpen?: boolean;
-  onPatchBlock?: (id: string, patch: Partial<SimulationBlock>) => void;
-  onRemoveBlock?: (id: string) => void;
-  onRemoveGroup?: (groupId: string) => void;
-  onScaleSelection?: (id: string, factor: number) => void;
-  /** Add a notebook-style text note at board coordinates (percent of stage). */
-  onAddTextNoteAt?: (xPct: number, yPct: number) => void;
+  onRemoveAiStroke?: (id: string) => void;
+  onClearAiBoard?: () => void;
 };
-
-function DraggablePlacedBlock({
-  block,
-  isSelected,
-  activeStep,
-  onSelectBlock,
-  onPatchBlock,
-}: {
-  block: SimulationBlock;
-  isSelected: boolean;
-  activeStep: number;
-  onSelectBlock: (id: string) => void;
-  onPatchBlock?: (id: string, patch: Partial<SimulationBlock>) => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({
-      id: `canvas:${block.id}`,
-      data: { kind: "canvas" as const, blockId: block.id },
-    });
-
-  const dragTransform = transform ? CSS.Translate.toString(transform) : "";
-  const visible = blockVisibleAtStep(block, activeStep);
-
-  return (
-    <div
-      ref={setNodeRef}
-      {...(visible ? listeners : {})}
-      {...(visible ? attributes : {})}
-      data-board-block
-      onPointerDownCapture={() => visible && onSelectBlock(block.id)}
-      aria-hidden={!visible}
-      className={`absolute touch-none rounded-sm transition-opacity duration-300 ${isDragging ? "z-[60]" : ""} ${
-        isSelected ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-transparent" : ""
-      } ${visible ? "" : "pointer-events-none opacity-0"}`}
-      style={{
-        left: `${block.x}%`,
-        top: `${block.y}%`,
-        width: 0,
-        height: 0,
-        transform: `translate(-50%, -50%)${dragTransform ? ` ${dragTransform}` : ""}`,
-        zIndex: (block.zIndex ?? 1) + (isDragging ? 40 : 0),
-        cursor: visible ? (isDragging ? "grabbing" : "grab") : "default",
-      }}
-    >
-      <BlockNode block={block} embedded onPatchBlock={onPatchBlock} />
-    </div>
-  );
-}
 
 export const SimulationCanvas = forwardRef<SimulationCanvasHandle, Props>(
   function SimulationCanvas(
     {
       title,
-      blocks,
+      aiStrokes,
+      notePanels,
       activeStep = 0,
       backdrop,
-      onOpenPalette,
-      paletteOpen = true,
-      onPatchBlock,
-      onRemoveBlock,
-      onRemoveGroup,
-      onScaleSelection,
-      onAddTextNoteAt,
+      onRemoveAiStroke,
+      onClearAiBoard,
     },
     ref,
   ) {
-    const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-    const [boardLocksBlocks, setBoardLocksBlocks] = useState(false);
+    const [boardLocksBoard, setBoardLocksBoard] = useState(false);
     const [boardZoom, setBoardZoom] = useState(1);
-    const stageRef = useRef<HTMLDivElement>(null);
     const zoomViewportRef = useRef<HTMLDivElement>(null);
+    const boardLayerRef = useRef<BoardLayerHandle>(null);
     const [boardToolbarHost, setBoardToolbarHost] =
       useState<HTMLDivElement | null>(null);
-    const { setNodeRef, isOver } = useDroppable({
-      id: STAGE_ID,
-      data: { kind: "stage" as const },
-    });
-
-    const setRefs = useCallback(
-      (el: HTMLDivElement | null) => {
-        setNodeRef(el);
-        stageRef.current = el;
-      },
-      [setNodeRef],
+    const [selectedStrokeId, setSelectedStrokeId] = useState<string | null>(
+      null,
     );
 
     useImperativeHandle(
       ref,
       () => ({
-        getBounds: () => stageRef.current?.getBoundingClientRect() ?? null,
-        selectBlock: (id: string) => setSelectedBlockId(id),
+        clearUserSketches: () => {
+          boardLayerRef.current?.clearAll();
+        },
       }),
       [],
     );
 
     useEffect(() => {
-      if (
-        selectedBlockId &&
-        !blocks.some((b) => b.id === selectedBlockId)
-      ) {
-        setSelectedBlockId(null);
-      }
-    }, [blocks, selectedBlockId]);
-
-    useEffect(() => {
-      if (!selectedBlockId) return;
-      const b = blocks.find((x) => x.id === selectedBlockId);
-      if (b && !blockVisibleAtStep(b, activeStep)) {
-        setSelectedBlockId(null);
-      }
-    }, [activeStep, blocks, selectedBlockId]);
-
-    useEffect(() => {
       const onKey = (e: KeyboardEvent) => {
-        if (e.key === "Escape") setSelectedBlockId(null);
+        if (e.key === "Escape") setSelectedStrokeId(null);
+        if (
+          (e.key === "Delete" || e.key === "Backspace") &&
+          selectedStrokeId &&
+          onRemoveAiStroke &&
+          !boardLocksBoard
+        ) {
+          const t = e.target as HTMLElement;
+          if (t.tagName === "INPUT" || t.tagName === "TEXTAREA") return;
+          e.preventDefault();
+          onRemoveAiStroke(selectedStrokeId);
+          setSelectedStrokeId(null);
+        }
       };
       window.addEventListener("keydown", onKey);
       return () => window.removeEventListener("keydown", onKey);
-    }, []);
+    }, [selectedStrokeId, onRemoveAiStroke, boardLocksBoard]);
 
     useEffect(() => {
       const el = zoomViewportRef.current;
@@ -201,48 +106,56 @@ export const SimulationCanvas = forwardRef<SimulationCanvasHandle, Props>(
 
     const z = boardZoom;
     const invPct = `${(100 / z).toFixed(4)}%`;
-    const sortedBlocks = useMemo(
-      () => [...blocks].sort((a, b) => (a.zIndex ?? 1) - (b.zIndex ?? 1)),
-      [blocks],
-    );
-    const selectedBlock =
-      selectedBlockId != null
-        ? (blocks.find((b) => b.id === selectedBlockId) ?? null)
-        : null;
+
+    const removeSelected = useCallback(() => {
+      if (selectedStrokeId && onRemoveAiStroke) {
+        onRemoveAiStroke(selectedStrokeId);
+        setSelectedStrokeId(null);
+      }
+    }, [selectedStrokeId, onRemoveAiStroke]);
 
     return (
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded-2xl border-2 border-white/70 bg-gradient-to-br from-sky-100 via-indigo-50 to-fuchsia-100 p-2 shadow-inner sm:rounded-3xl sm:border-[3px] sm:p-2.5">
-        <header className="mb-1 flex shrink-0 items-center justify-between gap-2 px-0.5">
-          <div className="flex min-w-0 items-center gap-1.5">
-            {!paletteOpen && onOpenPalette && (
-              <button
-                type="button"
-                onClick={onOpenPalette}
-                className="shrink-0 rounded-lg border border-indigo-200 bg-white/90 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-indigo-700 shadow-sm hover:bg-violet-50"
-                title="Open block palette"
-              >
-                Blocks
-              </button>
-            )}
-            {onAddTextNoteAt && (
-              <button
-                type="button"
-                onClick={() => onAddTextNoteAt(50, 45)}
-                className="shrink-0 rounded-lg border border-amber-300 bg-amber-50/95 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-950 shadow-sm hover:bg-amber-100"
-                title="Add a writable note at the center of the board"
-              >
-                Write note
-              </button>
-            )}
-            <h2 className="truncate text-sm font-black tracking-tight text-indigo-950 sm:text-base">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded-2xl border border-slate-200/90 bg-white p-2 shadow-sm sm:rounded-3xl sm:p-2.5">
+        <header className="mb-1 flex shrink-0 flex-wrap items-center justify-between gap-2 px-0.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <h2 className="truncate text-sm font-bold tracking-tight text-slate-900 sm:text-base">
               {title}
             </h2>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            <div className="flex items-center gap-0.5 rounded-lg border border-indigo-200/90 bg-white/90 p-0.5 shadow-sm">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+            {selectedStrokeId && onRemoveAiStroke && (
               <button
                 type="button"
-                className="flex h-7 w-7 items-center justify-center rounded-md text-sm font-black text-indigo-800 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={removeSelected}
+                className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-800 hover:bg-rose-100"
+              >
+                Remove line
+              </button>
+            )}
+            {onClearAiBoard && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    typeof window !== "undefined" &&
+                    !window.confirm(
+                      "Clear the AI drawing and notes from the board?",
+                    )
+                  ) {
+                    return;
+                  }
+                  setSelectedStrokeId(null);
+                  onClearAiBoard();
+                }}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700 hover:bg-slate-100"
+              >
+                Clear AI
+              </button>
+            )}
+            <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
+              <button
+                type="button"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-sm font-bold text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Zoom out"
                 title="Zoom out"
                 disabled={boardZoom <= ZOOM_MIN + 0.01}
@@ -252,12 +165,12 @@ export const SimulationCanvas = forwardRef<SimulationCanvasHandle, Props>(
               >
                 −
               </button>
-              <span className="min-w-[2.75rem] text-center text-[10px] font-black tabular-nums text-indigo-900">
+              <span className="min-w-[2.75rem] text-center text-[10px] font-bold tabular-nums text-slate-800">
                 {Math.round(boardZoom * 100)}%
               </span>
               <button
                 type="button"
-                className="flex h-7 w-7 items-center justify-center rounded-md text-sm font-black text-indigo-800 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-sm font-bold text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Zoom in"
                 title="Zoom in"
                 disabled={boardZoom >= ZOOM_MAX - 0.01}
@@ -269,7 +182,7 @@ export const SimulationCanvas = forwardRef<SimulationCanvasHandle, Props>(
               </button>
               <button
                 type="button"
-                className="rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-indigo-600 hover:bg-violet-100"
+                className="rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-600 hover:bg-slate-100"
                 title="Reset zoom (100%)"
                 aria-label="Reset zoom to one hundred percent"
                 onClick={() => setBoardZoom(1)}
@@ -277,73 +190,19 @@ export const SimulationCanvas = forwardRef<SimulationCanvasHandle, Props>(
                 1:1
               </button>
             </div>
-            <span className="hidden rounded-full bg-white/85 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-600 shadow-sm sm:inline">
-              Board
-            </span>
           </div>
         </header>
-        {selectedBlock && onScaleSelection && onRemoveBlock && (
-          <SelectedBlockToolbar
-            block={selectedBlock}
-            onSmaller={() => onScaleSelection(selectedBlock.id, 0.9)}
-            onLarger={() => onScaleSelection(selectedBlock.id, 1.1)}
-            onDelete={() => {
-              onRemoveBlock(selectedBlock.id);
-              setSelectedBlockId(null);
-            }}
-            onDeleteGroup={
-              selectedBlock.groupId && onRemoveGroup
-                ? () => {
-                    if (
-                      typeof window !== "undefined" &&
-                      !window.confirm(
-                        "Remove the whole grouped scene? This deletes every block in that group.",
-                      )
-                    ) {
-                      return;
-                    }
-                    onRemoveGroup(selectedBlock.groupId!);
-                    setSelectedBlockId(null);
-                  }
-                : undefined
-            }
-          />
-        )}
         <div
           ref={zoomViewportRef}
           title="Ctrl or ⌘ + scroll wheel to zoom"
-          className={`relative min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200/90 bg-neutral-100 ${
-            isOver ? "ring-2 ring-amber-300/80 sm:ring-4" : ""
-          }`}
+          className="relative min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200/90 bg-neutral-200/40"
         >
           <div
             id={STAGE_ID}
-            ref={setRefs}
-            onPointerDownCapture={(e) => {
-              const t = e.target as HTMLElement;
-              if (t.closest("[data-board-block]")) return;
-              setSelectedBlockId(null);
-            }}
-            onDoubleClick={(e) => {
-              if (!onAddTextNoteAt) return;
-              const el = e.target as HTMLElement;
-              if (el.closest("[data-board-block]")) return;
-              if (el.closest("[data-scispark-board-chrome]")) return;
-              if (el.closest("[data-board-drawing-active]")) return;
-              const rect = stageRef.current?.getBoundingClientRect();
-              if (!rect?.width || !rect.height) return;
-              const xPct = clampPct(
-                ((e.clientX - rect.left) / rect.width) * 100,
-              );
-              const yPct = clampPct(
-                ((e.clientY - rect.top) / rect.height) * 100,
-              );
-              onAddTextNoteAt(xPct, yPct);
-            }}
             className={
               backdrop && backdrop.type !== "plain"
                 ? "relative bg-slate-900/5"
-                : "relative bg-white"
+                : "relative bg-[#fafafa]"
             }
             style={{
               width: invPct,
@@ -354,26 +213,19 @@ export const SimulationCanvas = forwardRef<SimulationCanvasHandle, Props>(
             }}
           >
             {backdrop ? <StageBackdrop backdrop={backdrop} /> : null}
-            <div
-              className={
-                boardLocksBlocks
-                  ? "pointer-events-none absolute inset-0 z-[1]"
-                  : "absolute inset-0 z-[1]"
-              }
-            >
-              {sortedBlocks.map((b) => (
-                <DraggablePlacedBlock
-                  key={b.id}
-                  block={b}
-                  activeStep={activeStep}
-                  isSelected={b.id === selectedBlockId}
-                  onSelectBlock={setSelectedBlockId}
-                  onPatchBlock={onPatchBlock}
-                />
-              ))}
+            <div data-ai-stroke-hit className="absolute inset-0 z-[4]">
+              <AIStrokeLayer
+                strokes={aiStrokes}
+                notePanels={notePanels}
+                activeStep={activeStep}
+                selectedStrokeId={selectedStrokeId}
+                onSelectStroke={setSelectedStrokeId}
+                drawingLocksBoard={boardLocksBoard}
+              />
             </div>
             <BoardLayer
-              onInteractionLockChange={setBoardLocksBlocks}
+              ref={boardLayerRef}
+              onInteractionLockChange={setBoardLocksBoard}
               toolbarPortalHost={boardToolbarHost}
             />
           </div>

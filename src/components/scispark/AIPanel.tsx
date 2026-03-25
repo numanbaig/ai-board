@@ -1,12 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import type { PromptSendOptions } from "./prompt-options";
 
 type ChatLine = { role: "user" | "assistant"; text: string };
 
 type Props = {
   messages: ChatLine[];
-  onSend: (text: string) => void;
+  onSend: (text: string, options?: PromptSendOptions) => void;
   loading: boolean;
   activeStep: number;
   totalSteps: number;
@@ -14,6 +15,7 @@ type Props = {
   lastMeta: { usedDemo: boolean; provider: string | null } | null;
   /** When false, main composer lives elsewhere (e.g. ConceptPromptBar). */
   showComposer?: boolean;
+  onClearSession?: () => void;
 };
 
 export function AIPanel({
@@ -25,6 +27,7 @@ export function AIPanel({
   onStepChange,
   lastMeta,
   showComposer = true,
+  onClearSession,
 }: Props) {
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -38,29 +41,42 @@ export function AIPanel({
     const t = input.trim();
     if (!t || loading) return;
     setInput("");
-    onSend(t);
+    onSend(t, { addToBoard: false });
   }
 
   return (
-    <aside className="flex max-h-[min(340px,36dvh)] min-h-0 w-full shrink-0 flex-col rounded-2xl border-2 border-white/70 bg-gradient-to-b from-white/90 to-violet-50/90 p-2 shadow-lg backdrop-blur-md lg:max-h-full lg:w-[280px] lg:rounded-3xl lg:border-[3px] lg:p-2.5 xl:w-[300px]">
-      <header className="shrink-0 border-b border-violet-100 pb-1.5">
-        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-fuchsia-600">
-          Teacher
-        </p>
-        <h2 className="text-sm font-black text-slate-900">Ask &amp; explore</h2>
-        {lastMeta && (
-          <p className="mt-1 text-[10px] font-medium text-slate-500">
-            {lastMeta.usedDemo
-              ? "Demo mode (add API keys for live AI)."
-              : `Powered by ${lastMeta.provider ?? "AI"}.`}
-          </p>
-        )}
+    <aside className="flex max-h-[min(340px,36dvh)] min-h-0 w-full shrink-0 flex-col rounded-2xl border border-slate-200/90 bg-white p-2 shadow-sm lg:max-h-full lg:w-[280px] lg:rounded-3xl lg:p-2.5 xl:w-[300px]">
+      <header className="shrink-0 border-b border-slate-100 pb-1.5">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
+              Teacher
+            </p>
+            <h2 className="text-sm font-bold text-slate-900">Chat</h2>
+            {lastMeta && (
+              <p className="mt-1 text-[10px] font-medium text-slate-500">
+                {lastMeta.usedDemo
+                  ? "Demo mode (add API keys for live AI)."
+                  : `Powered by ${lastMeta.provider ?? "AI"}.`}
+              </p>
+            )}
+          </div>
+          {onClearSession && (
+            <button
+              type="button"
+              onClick={onClearSession}
+              className="shrink-0 rounded-lg border border-slate-200 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-600 hover:bg-slate-50"
+            >
+              New session
+            </button>
+          )}
+        </div>
       </header>
 
       {totalSteps > 0 && (
-        <div className="mt-1.5 shrink-0 rounded-xl border border-violet-100 bg-white/80 p-1.5 shadow-inner">
-          <p className="mb-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-700">
-            Story step
+        <div className="mt-1.5 shrink-0 rounded-xl border border-slate-100 bg-slate-50/90 p-1.5">
+          <p className="mb-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-600">
+            Lesson step
           </p>
           <div className="flex items-center gap-2">
             <input
@@ -69,10 +85,10 @@ export function AIPanel({
               max={Math.max(0, totalSteps - 1)}
               value={Math.min(activeStep, totalSteps - 1)}
               onChange={(e) => onStepChange(Number(e.target.value))}
-              className="flex-1 accent-violet-600"
+              className="flex-1 accent-slate-800"
               aria-label="Explanation step"
             />
-            <span className="w-10 text-center text-xs font-black text-violet-900">
+            <span className="w-10 text-center text-xs font-bold text-slate-900">
               {activeStep + 1}/{totalSteps}
             </span>
           </div>
@@ -82,8 +98,8 @@ export function AIPanel({
       <div className="mt-1.5 min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain rounded-xl border border-slate-100 bg-slate-50/80 p-1.5 lg:max-h-none">
         {messages.length === 0 && (
           <p className="p-1.5 text-xs font-medium text-slate-600">
-            Try: &quot;How does Earth go around the Sun?&quot; or &quot;Show me
-            fractions with a pie.&quot;
+            Try: &quot;Explain the water cycle&quot; or &quot;What is gravity?&quot;
+            — the board will sketch and narrate step by step.
           </p>
         )}
         {messages.map((m, i) => (
@@ -91,16 +107,16 @@ export function AIPanel({
             key={i}
             className={`max-w-[95%] rounded-xl px-2.5 py-1.5 text-xs leading-snug shadow-sm sm:text-sm ${
               m.role === "user"
-                ? "ml-auto bg-gradient-to-br from-sky-500 to-indigo-600 font-semibold text-white"
-                : "mr-auto border border-violet-100 bg-white font-medium text-slate-800"
+                ? "ml-auto bg-slate-800 font-semibold text-white"
+                : "mr-auto border border-slate-100 bg-white font-medium text-slate-800"
             }`}
           >
             {m.text}
           </div>
         ))}
         {loading && (
-          <div className="mr-auto rounded-2xl border border-dashed border-violet-200 bg-white px-3 py-2 text-sm font-medium text-violet-700">
-            Building your scene…
+          <div className="mr-auto rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600">
+            Drawing on the board…
           </div>
         )}
         <div ref={bottomRef} />
@@ -109,13 +125,13 @@ export function AIPanel({
       {showComposer ? (
         <form
           onSubmit={handleSubmit}
-          className="mt-1.5 flex h-10 shrink-0 gap-1.5 border-t border-violet-100/90 pt-1.5 sm:h-11"
+          className="mt-1.5 flex h-10 shrink-0 gap-1.5 border-t border-slate-100 pt-1.5 sm:h-11"
         >
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="What do you wonder?"
-            className="min-w-0 flex-1 rounded-xl border-2 border-violet-100 bg-white px-2.5 text-xs font-medium text-slate-900 shadow-inner outline-none ring-violet-400 placeholder:text-slate-400 focus:border-violet-300 focus:ring-2 sm:text-sm"
+            className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-900 shadow-inner outline-none ring-slate-400 placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 sm:text-sm"
             disabled={loading}
             maxLength={2000}
             aria-label="Your question"
@@ -123,13 +139,13 @@ export function AIPanel({
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="h-full shrink-0 rounded-xl bg-gradient-to-br from-fuchsia-500 to-orange-400 px-3 text-xs font-black text-white shadow-md transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:text-sm"
+            className="h-full shrink-0 rounded-xl bg-slate-900 px-3 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:text-sm"
           >
             Go
           </button>
         </form>
       ) : (
-        <p className="mt-1.5 shrink-0 border-t border-violet-100/90 pt-1.5 text-[10px] font-medium text-slate-500">
+        <p className="mt-1.5 shrink-0 border-t border-slate-100 pt-1.5 text-[10px] font-medium text-slate-500">
           Ask below the board — your chat history stays here.
         </p>
       )}
