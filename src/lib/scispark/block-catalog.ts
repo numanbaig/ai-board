@@ -92,6 +92,19 @@ export const BLOCK_CATEGORIES: BlockCategory[] = [
         hint: "Three corners",
       },
       {
+        type: "shape-block",
+        label: "Custom shape",
+        emoji: "◇",
+        hint:
+          "Fallback for ANY science idea without a catalog block. props: shapeKind = rect | roundRect | ellipse | line | arrow | triangle | diamond | hexagon | arc | wave | zigzag | coil | star — plus fill, stroke, strokeWidth, rotationDeg, dashed, cornerRadius, arcSweepDeg, showFromStep",
+        defaultProps: {
+          shapeKind: "ellipse",
+          fill: "rgba(56,189,248,0.28)",
+          stroke: "#0369a1",
+          strokeWidth: 2.5,
+        },
+      },
+      {
         type: "protractor",
         label: "Protractor",
         emoji: "📐",
@@ -144,7 +157,7 @@ export const BLOCK_CATEGORIES: BlockCategory[] = [
         label: "Lesson frame",
         emoji: "▢",
         hint:
-          "Dashed focus area behind a lesson; use zIndex 0 and same groupId as other blocks",
+          "Dashed lesson boundary — zIndex 0, same groupId; center ~x50 y52 w380 h300; place number-line, fraction-pie, graphs INSIDE the box (not on empty canvas)",
         defaultProps: { title: "Lesson" },
       },
     ],

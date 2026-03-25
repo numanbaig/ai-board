@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SimulationBlock } from "@/lib/scispark/simulation-schema";
+import { ShapeBlockView, shapeBlockFromProps } from "./ShapeBlockView";
 
 type Props = {
   block: SimulationBlock;
@@ -281,6 +282,18 @@ export function BlockNode({
           />
           {labelEl}
         </div>
+      );
+
+    case "shape-block":
+      return (
+        <ShapeBlockView
+          baseStyle={baseStyle}
+          w={w}
+          h={h}
+          anim={anim}
+          labelEl={labelEl}
+          shapeProps={props as Record<string, unknown>}
+        />
       );
 
     case "circle-shape":
@@ -1024,12 +1037,29 @@ export function BlockNode({
       );
 
     default:
+      if (shapeBlockFromProps(props as Record<string, unknown>)) {
+        return (
+          <ShapeBlockView
+            baseStyle={baseStyle}
+            w={w}
+            h={h}
+            anim={anim}
+            labelEl={labelEl}
+            shapeProps={props as Record<string, unknown>}
+          />
+        );
+      }
       return (
         <div
           style={baseStyle}
-          className="flex items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white/80 text-[10px] font-bold text-slate-500"
+          className="flex flex-col items-center justify-center gap-0.5 rounded-xl border-2 border-dashed border-slate-300 bg-white/80 px-1 text-center"
         >
-          {block.type}
+          <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
+            custom
+          </span>
+          <span className="max-w-full truncate text-[10px] font-bold text-slate-600">
+            {block.type}
+          </span>
           {labelEl}
         </div>
       );

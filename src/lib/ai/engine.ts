@@ -9,6 +9,7 @@ import {
 } from "@/lib/scispark/simulation-schema";
 import { blockCatalogPromptFragment } from "@/lib/scispark/block-catalog";
 import { demoSimulationForQuestion } from "@/lib/scispark/demo-simulations";
+import { coerceRawSimulationJson } from "@/lib/scispark/spec-coerce";
 import { normalizeSimulationSpec } from "@/lib/scispark/spec-normalize";
 
 function stripJsonFence(raw: string): string {
@@ -74,7 +75,7 @@ export async function generateSimulationFromQuestion(
 
     const json = stripJsonFence(text);
     const raw = JSON.parse(json) as unknown;
-    const parsed = simulationSpecSchema.safeParse(raw);
+    const parsed = simulationSpecSchema.safeParse(coerceRawSimulationJson(raw));
     if (!parsed.success) {
       return {
         ok: false,

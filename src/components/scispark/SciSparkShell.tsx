@@ -61,6 +61,7 @@ const DEFAULT_BLOCK_SIZE: Record<string, [number, number]> = {
   "flow-tube": [220, 40],
   "barrier-wall": [22, 130],
   protractor: [200, 100],
+  "shape-block": [112, 80],
 };
 
 function defaultBlockForType(type: string, x: number, y: number): SimulationBlock {

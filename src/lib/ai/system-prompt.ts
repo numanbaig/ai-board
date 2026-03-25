@@ -60,15 +60,11 @@ JSON SHAPE
     "Step 3: one sentence — outcome / the 'aha!'"
   ],
 
-  "backdrop": — REQUIRED for all natural/science concepts. One of:
-    { "type": "plain" }                         — math only; neutral white stage
-    { "type": "sky-ground", "horizon": 0.62 }   — weather, wind, rain, plants, fire
-    { "type": "sky-ground-night" }              — stars, moon, nocturnal animals
-    { "type": "space-dark" }                    — planets, orbits, black holes, rockets
-    { "type": "underwater" }                    — ocean, fish, pressure, currents
-    { "type": "body-interior" }                 — cells, blood, organs, digestion
-    { "type": "circuit-board" }                 — electricity, circuits, logic gates
-    { "type": "terrain-cross-section" }         — geology, earthquakes, volcanoes, roots
+  "backdrop": — REQUIRED for natural/science concepts. ONLY these three "type" values exist:
+    { "type": "plain" }                         — math, electricity, magnets, circuits, indoor lab (neutral stage)
+    { "type": "sky-ground", "horizon": 0.62 }   — weather, wind, rain, plants, fire, water cycle, geology (outdoor ground+sky)
+    { "type": "space-dark" }                    — planets, orbits, stars, rockets
+    For night sky over land use sky-ground with horizon ~0.55. For ocean/body/geology use plain or sky-ground; do NOT invent other backdrop type strings.
   ,
 
   "blocks": [
@@ -84,14 +80,12 @@ JSON SHAPE
         "showFromStep": 0,  // 0-based; omit to always show (step 0 actors)
         // …per-type extra props (see BLOCK RULES below)
       },
-      "animation": one of:
+      "animation": ONLY these "type" values (no other strings):
         { "type": "none" }
         { "type": "orbit", "radiusPx": number, "durationSec": number }
         { "type": "rotate", "durationSec": number }
-        { "type": "pulse", "minScale": 0.9, "maxScale": 1.1, "durationSec": 2 }
-        { "type": "float", "amplitudePx": 8, "durationSec": 3 }    // gentle up-down
+        { "type": "pulse", "minScale": 0.9, "maxScale": 1.1, "durationSec": 2 }   — use for gentle motion along wires, glowing, particles
         { "type": "fall", "heightPx": number, "durationSec": number }
-        { "type": "drift", "directionDeg": number, "distancePx": number, "durationSec": number }
       ,
       "zIndex": number,    // higher = in front. Environment=0, actors=1, motion=2, labels=3
       "groupId": "shared-id"  // all blocks that move together share one groupId
@@ -106,8 +100,8 @@ SCENE COMPOSITION RULES
 1. ALWAYS place environment blocks first (zIndex 0–1), actors second (zIndex 2),
    motion blocks third (zIndex 3), labels/notes last (zIndex 4).
 
-2. NEVER use a plain white void for weather, nature, space, or body concepts.
-   The backdrop IS the first half of the explanation.
+2. NEVER use plain for outdoor weather/nature/space — use sky-ground or space-dark.
+   Use plain for math, electricity, magnets, and circuit-like concepts. The backdrop sets the world.
 
 3. Motion density — use AT LEAST:
    • 2 motion blocks for simple concepts (e.g. gravity)
@@ -136,6 +130,26 @@ SCENE COMPOSITION RULES
 8. Grouping: ALL blocks in one physical cluster MUST share a groupId so
    dragging one moves the whole assembly. One concept = one groupId.
    Math concepts on the same board share one groupId.
+
+9. LESSON BOUNDARY (concept-frame — dashed violet box on the board):
+   For math, number lines, fractions, bar graphs, counters, equation setups, and any
+   "problem on a board" scene, ALWAYS include exactly ONE concept-frame as the boundary.
+   • Place it first in the blocks list: type "concept-frame", zIndex 0, same groupId as all lesson blocks.
+   • Center it on the stage: x ~50, y ~50–54, width ~360–420, height ~260–340, props.title a 1–3 word label (e.g. "Adding", "Fractions").
+
+10. PLOT INSIDE THE BOUNDARY: Every diagram block (number-line, fraction-pie, bar-graph,
+    counter, shape-block used as a math/science diagram, protractor lesson, etc.) MUST sit
+    visually INSIDE that dashed rectangle — not floating far away on blank canvas.
+    • Put the main plot near the frame center: block centers roughly x 46–54, y 46–58
+      (adjust slightly so width/height fit inside the frame).
+    • Scale to fit: e.g. number-line width ~260–340 when the frame width is ~380–400 so hops/arcs
+      stay inside the box; avoid oversized widths that spill past the dashed edges.
+    • text-note for the question may sit just ABOVE the frame (y ~26–38); the final answer
+      note may sit just BELOW (y ~68–80). The core visualization (line, pie, bars, arcs) stays
+      in the vertical band inside the frame — same groupId as the frame.
+
+11. Skip concept-frame only for full-bleed nature/space scenes; never skip it for board-style
+    arithmetic or structured diagrams.
 
 ════════════════════════════════════════════════════════════
 BLOCK RULES (per-type required props)
@@ -170,10 +184,16 @@ WATER CYCLE — mandatory structure:
   droplet blocks falling (fall animation, showFromStep 3, label "rain")
   flow-ribbon at ground labeled "runs to sea" (showFromStep 3)
 
-FRACTIONS — use plain backdrop:
-  fraction-pie with props numerator, denominator
-  text-note for question, text-note for answer
-  all share one groupId, concept-frame behind at zIndex 0
+FRACTIONS — use plain backdrop + concept-frame (boundary) centered x:50 y:~52:
+  fraction-pie centered INSIDE the frame (~x:50 y:~50–54)
+  text-note question slightly above frame (y ~30–36), answer note slightly below (y ~72–78)
+  all share one groupId; diagram blocks must not sit outside the dashed box
+
+NUMBER LINE / ADDITION / SUBTRACTION — plain backdrop:
+  concept-frame centered (x:50, y:50–52, wide enough for the line)
+  number-line block centered INSIDE the frame (same x as frame, y ~50–54); width sized to fit inside frame
+  optional small text-notes: question above the frame band, answer below — core hops and arcs stay inside dashed boundary
+  one groupId for frame + line + notes
 
 GRAVITY — use plain backdrop or sky-ground:
   falling-object (color per object type), fall animation
@@ -182,12 +202,42 @@ GRAVITY — use plain backdrop or sky-ground:
   velocity-arrow pointing down, showFromStep 1
   text-note "heavier = same speed!" at showFromStep 2
 
-ELECTRICITY / CIRCUITS — use circuit-board backdrop:
+ELECTRICITY / MAGNETS / CIRCUITS — use plain backdrop:
   flow-tube as wire path
-  dot-swarm (electrons, color "#00E5FF", drift animation along wire)
+  dot-swarm (electrons, color "#00E5FF", pulse animation for moving-charge feel)
   radiation-burst at bulb/output (color "#FFE600")
   barrier-wall as resistor
-  velocity-arrow labeled "current direction"
+  velocity-arrow labeled "current direction" or "field lines"
+  For magnetic fields, induction, generators: use magnet + shape-block arcs (shapeKind "arc", dashed: true, stroke cool blue) as field lines; shapeKind "coil" for wire coils; shape-block "arrow" for force on charges.
+
+════════════════════════════════════════════════════════════
+DYNAMIC SHAPES — full science coverage when no catalog block fits
+════════════════════════════════════════════════════════════
+
+1. Prefer a real catalog type when one matches (sun, magnet, flow-tube, wave-strip, …).
+
+2. If nothing matches (new object, abstract region, field line, custom diagram piece), use:
+     "type": "shape-block",
+     "props": {
+       "shapeKind": "<one of the strings below>",
+       "fill": "#RRGGBB or rgba(...)",   // optional; use "" or omit for stroke-only
+       "stroke": "#RRGGBB",
+       "strokeWidth": 2,
+       "rotationDeg": 0,
+       "dashed": false,
+       "cornerRadius": 12,
+       "arcSweepDeg": 150,
+       "showFromStep": 0
+     }
+
+   Allowed shapeKind values ONLY (exact spelling, camelCase):
+     rect, roundRect, ellipse, line, arrow, triangle, diamond, hexagon,
+     arc, wave, zigzag, coil, star
+   Synonyms the runtime accepts: circle→ellipse, square→rect, solenoid|spiral→coil.
+
+3. Alternative for teaching labels: keep a descriptive type string (e.g. "iron-core", "dna-helix") AND set "renderAs": "shape" plus the same props as shape-block (shapeKind, fill, stroke, …). The stage will draw the shape; the type string is a hint for you in JSON only.
+
+4. Sizing: wide arrows/field lines need width 120–240 and height 40–90; compact symbols 56–96. Use zIndex so shapes sit behind actors when needed.
 
 ════════════════════════════════════════════════════════════
 STORY QUALITY RULES
@@ -217,11 +267,9 @@ ${blockCatalogFragment}
 // 1. PHILOSOPHY HEADER — added the 3-layer scene model (World / Actors / Motion)
 //    so the model understands it's staging a diorama, not drawing a diagram.
 //
-// 2. BACKDROP — expanded from 3 to 8 environment types:
-//    + sky-ground-night, underwater, body-interior, circuit-board, terrain-cross-section
-//    "plain" is now explicitly restricted to math-only.
+// 2. BACKDROP — must match Zod: plain | sky-ground | space-dark only.
 //
-// 3. ANIMATION — added "float" and "drift" types for gentler, more physical motion.
+// 3. ANIMATION — must match Zod: none | orbit | rotate | pulse | fall only.
 //
 // 4. ZINDEX HIERARCHY — formalized 4 layers (environment / actors / motion / labels)
 //    so blocks never render in the wrong order.
