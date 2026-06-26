@@ -1,7 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  DEFAULT_PEN_COLOR_HEX,
+  DEFAULT_PEN_WIDTH_PX,
+} from "./board-types";
+import { resolveStrokePoints } from "@/lib/scispark/marker-shape-points";
 import type { AiStroke, NotePanel } from "@/lib/scispark/simulation-schema";
 
 const VB = 100;
@@ -85,6 +90,25 @@ export function AIStrokeLayer({
   onSelectStroke,
   drawingLocksBoard,
 }: Props) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [svgWidthPx, setSvgWidthPx] = useState(400);
+
+  useLayoutEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.getBoundingClientRect().width;
+      if (w > 0) setSvgWidthPx(w);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const strokeWidthUnits = (penPx: number) =>
+    (penPx * VB) / Math.max(svgWidthPx, 1);
+
   const visibleNotes = useMemo(
     () =>
       (notePanels ?? []).filter((n) => n.stepIndex <= activeStep),
@@ -106,7 +130,8 @@ export function AIStrokeLayer({
     const hitPx = 14 / Math.min(rect.width, rect.height);
     let best: { id: string; d: number } | null = null;
     for (const s of visibleStrokes) {
-      const d = distToPolyline01(px, py, s.points);
+      const pts = resolveStrokePoints(s);
+      const d = distToPolyline01(px, py, pts);
       if (d < hitPx && (!best || d < best.d)) {
         best = { id: s.id, d };
       }
@@ -121,6 +146,7 @@ export function AIStrokeLayer({
   return (
     <>
       <svg
+        ref={svgRef}
         className="absolute inset-0 z-[5] h-full w-full"
         viewBox={`0 0 ${VB} ${VB}`}
         preserveAspectRatio="none"
@@ -132,24 +158,22 @@ export function AIStrokeLayer({
         aria-hidden
       >
         {visibleStrokes.map((s) => {
-          const d = toPathD(s.points);
-          const len = pathLen01(s.points);
+          const resolved = resolveStrokePoints(s);
+          const d = toPathD(resolved);
+          const len = pathLen01(resolved);
           const dur = Math.min(2.4, 0.35 + len * 0.018);
-          const sw = Math.max(
-            0.25,
-            ((s.lineWidth ?? 3) / 600) * VB * 1.2,
-          );
+          const penPx = s.lineWidth ?? DEFAULT_PEN_WIDTH_PX;
+          const sw = strokeWidthUnits(penPx);
           const unlocked = (s.stepIndex ?? 0) <= activeStep;
           return (
             <motion.path
               key={s.id}
               d={d}
               fill="none"
-              stroke={s.color ?? "#1e293b"}
+              stroke={s.color ?? DEFAULT_PEN_COLOR_HEX}
               strokeWidth={sw}
               strokeLinecap="round"
               strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
               initial={false}
               animate={{
                 pathLength: unlocked ? 1 : 0,

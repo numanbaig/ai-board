@@ -365,7 +365,7 @@ export const BoardLayer = forwardRef<BoardLayerHandle, Props>(function BoardLaye
     <>
       <div
         ref={wrapRef}
-        className={`pointer-events-none absolute inset-0 z-[8] ${
+        className={`pointer-events-none absolute inset-0 z-[100] ${
           canvasInteractive ? "cursor-crosshair touch-none" : ""
         }`}
         aria-hidden={!drawing}
@@ -376,6 +376,11 @@ export const BoardLayer = forwardRef<BoardLayerHandle, Props>(function BoardLaye
           className={`absolute inset-0 block h-full w-full ${
             canvasInteractive ? "pointer-events-auto" : "pointer-events-none"
           }`}
+          style={
+            canvasInteractive
+              ? { touchAction: "none" as const }
+              : undefined
+          }
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}

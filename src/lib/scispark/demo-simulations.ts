@@ -1,13 +1,29 @@
-import type { AiStroke, NotePanel, SimulationSpec } from "./simulation-schema";
+import type {
+  AiStroke,
+  AiStrokeShape,
+  NotePanel,
+  SimulationSpec,
+} from "./simulation-schema";
 
 function stroke(
   id: string,
   points: { x: number; y: number }[],
   stepIndex: number,
-  color = "#1e293b",
-  lineWidth = 3,
+  color = "#1e1b4b",
+  lineWidth = 4,
 ): AiStroke {
   return { id, points, stepIndex, color, lineWidth };
+}
+
+/** Marker-wobbly basic shape (circle, ellipse, line, arrow) — preferred over hand-tessellated circles. */
+function strokeShape(
+  id: string,
+  shape: AiStrokeShape,
+  stepIndex: number,
+  color = "#1e1b4b",
+  lineWidth = 4,
+): AiStroke {
+  return { id, shape, stepIndex, color, lineWidth };
 }
 
 function note(
@@ -93,7 +109,7 @@ function waterCycleDemo(): SimulationSpec {
         ],
         1,
         "#94a3b8",
-        2.5,
+        2,
       ),
       stroke(
         "w-cloud",
@@ -140,7 +156,7 @@ function waterCycleDemo(): SimulationSpec {
         ],
         3,
         "#1e293b",
-        2.5,
+        2,
       ),
     ],
     notePanels: [
@@ -192,15 +208,27 @@ function orbitDemo(): SimulationSpec {
       "Gravity pulls Earth toward the Sun while speed keeps it curving around.",
     ],
     aiStrokes: [
-      stroke("o-sun", circleLike(0.5, 0.45, 0.06, 16), 0, "#fbbf24", 4),
-      stroke(
+      strokeShape(
+        "o-sun",
+        { type: "circle", cx: 0.5, cy: 0.45, r: 0.06 },
+        0,
+        "#fbbf24",
+        4,
+      ),
+      strokeShape(
         "o-orbit",
-        circleLike(0.5, 0.45, 0.22, 48),
+        { type: "ellipse", cx: 0.5, cy: 0.45, rx: 0.22, ry: 0.22 },
         1,
         "rgba(148,163,184,0.55)",
         2,
       ),
-      stroke("o-earth", circleLike(0.72, 0.45, 0.025, 12), 1, "#38bdf8", 3),
+      strokeShape(
+        "o-earth",
+        { type: "circle", cx: 0.72, cy: 0.45, r: 0.025 },
+        1,
+        "#38bdf8",
+        3,
+      ),
       stroke(
         "o-motion",
         [
@@ -210,7 +238,7 @@ function orbitDemo(): SimulationSpec {
         ],
         2,
         "#94a3b8",
-        2.5,
+        2,
       ),
     ],
     notePanels: [
@@ -331,7 +359,7 @@ function additionDemo(): SimulationSpec {
         ],
         1,
         "#7c3aed",
-        2.5,
+        2,
       ),
       stroke(
         "a-hop2",
@@ -342,7 +370,7 @@ function additionDemo(): SimulationSpec {
         ],
         2,
         "#7c3aed",
-        2.5,
+        2,
       ),
     ],
     notePanels: [

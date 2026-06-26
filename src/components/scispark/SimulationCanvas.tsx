@@ -195,25 +195,28 @@ export const SimulationCanvas = forwardRef<SimulationCanvasHandle, Props>(
         <div
           ref={zoomViewportRef}
           title="Ctrl or ⌘ + scroll wheel to zoom"
-          className="relative min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200/90 bg-neutral-200/40"
+          className="relative min-h-[min(50dvh,520px)] min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200/90 bg-neutral-200/40"
         >
           <div
             id={STAGE_ID}
             className={
               backdrop && backdrop.type !== "plain"
-                ? "relative bg-slate-900/5"
-                : "relative bg-[#fafafa]"
+                ? "relative isolate bg-slate-900/5"
+                : "relative isolate bg-[#fafafa]"
             }
             style={{
               width: invPct,
               height: invPct,
-              minHeight: "100%",
+              minHeight: "min(70dvh, 720px)",
               transform: `scale(${z})`,
               transformOrigin: "top left",
             }}
           >
             {backdrop ? <StageBackdrop backdrop={backdrop} /> : null}
-            <div data-ai-stroke-hit className="absolute inset-0 z-[4]">
+            <div
+              data-ai-stroke-hit
+              className={`absolute inset-0 z-[4] ${boardLocksBoard ? "pointer-events-none" : ""}`}
+            >
               <AIStrokeLayer
                 strokes={aiStrokes}
                 notePanels={notePanels}

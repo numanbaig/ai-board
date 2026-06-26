@@ -16,9 +16,16 @@ OUTPUT JSON SHAPE (required keys)
   "aiStrokes": [
     {
       "id": "unique-kebab-id",
+      "shape": { "type": "circle", "cx": 0.5, "cy": 0.45, "r": 0.08 },
+      "lineWidth": 4,
+      "color": "#1e1b4b",
+      "stepIndex": 0
+    },
+    {
+      "id": "another-id",
       "points": [ { "x": 0.1, "y": 0.5 }, { "x": 0.3, "y": 0.45 } ],
-      "lineWidth": 3,
-      "color": "#1e293b",
+      "lineWidth": 4,
+      "color": "#1e1b4b",
       "stepIndex": 0
     }
   ],
@@ -39,11 +46,17 @@ OUTPUT JSON SHAPE (required keys)
 COORDINATES AND STROKES
 ════════════════════════════════════════════════════════════
 
-- aiStrokes[].points use normalized coordinates: x and y from 0 to 1 across the FULL stage
-  (0,0 = top-left, 1,1 = bottom-right). Use enough points for smooth curves (8–40 per stroke).
-- Draw like chalk: mostly dark ink "#1e293b" or "#0f172a"; use accent colors sparingly for emphasis
-  (e.g. "#2563eb" water, "#16a34a" plants, "#ea580c" sun heat).
-- lineWidth: typically 2–6 for sketch lines; slightly thicker for main outlines.
+- Prefer "shape" for basic geometry; the app draws it with a slight marker wobble (hand-traced look):
+  - circle: { "type": "circle", "cx", "cy", "r" } — Sun, planets, dots (r in 0–1 stage units).
+  - ellipse: { "type": "ellipse", "cx", "cy", "rx", "ry", optional "rotationDeg" } — orbits, ovals.
+  - line: { "type": "line", "x1", "y1", "x2", "y2" } — straight segments.
+  - arrow: same endpoints as line; a small arrowhead is added at (x2,y2).
+- Use "points" (freehand polyline) for anything that is NOT one of the shapes above: clouds, wavy paths,
+  irregular labels-as-strokes, compound curves. Each stroke must have EITHER "shape" OR at least 2 points.
+- All coordinates are normalized 0–1 across the FULL stage (0,0 = top-left, 1,1 = bottom-right).
+  For freehand, use enough points for smooth curves (8–40 per stroke).
+- Use the SAME pen settings as the app: lineWidth MUST be exactly 2, 4, or 8 (CSS pixels) — same as Thin / Med / Thick in the toolbar.
+  Default ink color "#1e1b4b"; accents may use the same palette as the pen: "#2563eb", "#dc2626", "#16a34a", "#d97706".
 - stepIndex: 0-based. Strokes with stepIndex N appear together with explanationSteps[N].
   Build the lesson in order: step 0 sets context; later steps add arrows, labels, cycles, detail.
 - Use MANY small strokes (10–40) rather than one giant stroke—like a teacher redrawing clearly.

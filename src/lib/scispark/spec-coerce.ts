@@ -1,3 +1,5 @@
+import { snapPenWidthPx } from "@/components/scispark/board-types";
+
 /**
  * Maps common model mistakes to values accepted by simulationSpecSchema
  * before Zod parse. Strips legacy "blocks" from older prompts.
@@ -47,6 +49,51 @@ function coerceStrokePoint(p: unknown): { x: number; y: number } | null {
   return { x, y };
 }
 
+function num(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Best-effort parse of `shape` before Zod (drops invalid shapes). */
+function coerceAiStrokeShape(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const o = raw as Record<string, unknown>;
+  const t = o.type;
+  if (t === "circle") {
+    const cx = num(o.cx);
+    const cy = num(o.cy);
+    const r = num(o.r);
+    if (cx == null || cy == null || r == null) return undefined;
+    return { type: "circle", cx, cy, r };
+  }
+  if (t === "ellipse") {
+    const cx = num(o.cx);
+    const cy = num(o.cy);
+    const rx = num(o.rx);
+    const ry = num(o.ry);
+    if (cx == null || cy == null || rx == null || ry == null) return undefined;
+    const rotationDeg = num(o.rotationDeg);
+    return {
+      type: "ellipse",
+      cx,
+      cy,
+      rx,
+      ry,
+      ...(rotationDeg != null ? { rotationDeg } : {}),
+    };
+  }
+  if (t === "line" || t === "arrow") {
+    const x1 = num(o.x1);
+    const y1 = num(o.y1);
+    const x2 = num(o.x2);
+    const y2 = num(o.y2);
+    if (x1 == null || y1 == null || x2 == null || y2 == null) return undefined;
+    return { type: t, x1, y1, x2, y2 };
+  }
+  return undefined;
+}
+
 function coerceAiStrokes(raw: unknown): unknown[] {
   if (!Array.isArray(raw)) return [];
   const out: unknown[] = [];
@@ -55,10 +102,31 @@ function coerceAiStrokes(raw: unknown): unknown[] {
     const o = { ...(s as Record<string, unknown>) };
     const pts = Array.isArray(o.points) ? o.points : [];
     const points = pts.map(coerceStrokePoint).filter(Boolean) as { x: number; y: number }[];
-    if (points.length < 2) continue;
-    o.points = points;
+    const shape = coerceAiStrokeShape(o.shape);
+    const hasShape = shape != null;
+    if (!hasShape && points.length < 2) continue;
+    if (hasShape) {
+      o.shape = shape;
+      if (points.length >= 2) {
+        o.points = points;
+      } else {
+        delete o.points;
+      }
+    } else {
+      o.points = points;
+      delete o.shape;
+    }
     if (typeof o.id !== "string" || !o.id) {
       o.id = `stroke-${out.length}-${Date.now()}`;
+    }
+    if (o.lineWidth !== undefined && o.lineWidth !== null) {
+      const lw =
+        typeof o.lineWidth === "number" ? o.lineWidth : Number(o.lineWidth);
+      if (Number.isFinite(lw)) {
+        o.lineWidth = snapPenWidthPx(lw);
+      } else {
+        delete o.lineWidth;
+      }
     }
     out.push(o);
   }

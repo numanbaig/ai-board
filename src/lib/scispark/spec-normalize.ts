@@ -1,27 +1,74 @@
-import type { AiStroke, NotePanel, SimulationSpec } from "./simulation-schema";
+import {
+  DEFAULT_PEN_COLOR_HEX,
+  DEFAULT_PEN_WIDTH_PX,
+  snapPenWidthPx,
+} from "@/components/scispark/board-types";
+import type {
+  AiStroke,
+  AiStrokeShape,
+  NotePanel,
+  SimulationSpec,
+} from "./simulation-schema";
 
 function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n));
 }
 
+function clampShape(sh: AiStrokeShape): AiStrokeShape {
+  switch (sh.type) {
+    case "circle":
+      return {
+        type: "circle",
+        cx: clamp01(sh.cx),
+        cy: clamp01(sh.cy),
+        r: Math.min(1.5, Math.max(0.002, sh.r)),
+      };
+    case "ellipse":
+      return {
+        type: "ellipse",
+        cx: clamp01(sh.cx),
+        cy: clamp01(sh.cy),
+        rx: Math.min(1, Math.max(0.002, sh.rx)),
+        ry: Math.min(1, Math.max(0.002, sh.ry)),
+        rotationDeg: sh.rotationDeg,
+      };
+    case "line":
+    case "arrow":
+      return {
+        type: sh.type,
+        x1: clamp01(sh.x1),
+        y1: clamp01(sh.y1),
+        x2: clamp01(sh.x2),
+        y2: clamp01(sh.y2),
+      };
+    default: {
+      const _exhaustive: never = sh;
+      return _exhaustive;
+    }
+  }
+}
+
 function clampStroke(s: AiStroke): AiStroke {
-  const points = s.points.map((p) => ({
-    x: clamp01(p.x),
-    y: clamp01(p.y),
-  }));
+  const points =
+    s.points?.map((p) => ({
+      x: clamp01(p.x),
+      y: clamp01(p.y),
+    })) ?? undefined;
+  const shape = s.shape ? clampShape(s.shape) : undefined;
   const stepIndex =
     s.stepIndex === undefined || Number.isNaN(s.stepIndex)
       ? 0
       : Math.max(0, Math.floor(s.stepIndex));
   return {
     ...s,
+    shape,
     points,
     stepIndex,
     lineWidth:
       s.lineWidth !== undefined && Number.isFinite(s.lineWidth)
-        ? Math.min(48, Math.max(0.5, s.lineWidth))
-        : 3,
-    color: s.color?.trim() || "#1e293b",
+        ? snapPenWidthPx(s.lineWidth)
+        : DEFAULT_PEN_WIDTH_PX,
+    color: s.color?.trim() || DEFAULT_PEN_COLOR_HEX,
   };
 }
 
